@@ -13,6 +13,7 @@ const int windowY = 300;
 int jump1,jump2,start=0,jump_r=0,jump_l=0;
 
 using namespace std;
+//change
 
 inline void CV_MAIN_LOOP();
 inline void CV_GAMEOVER();
