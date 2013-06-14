@@ -1,6 +1,7 @@
 #include "opencv\cv.h"
 //#include "opencv2\\opencv.hpp"
 #include "opencv\highgui.h"
+#include <freegl/glut.h>
 #include <cstdio>
 #include <cmath>
 #include <iostream>
@@ -11,6 +12,25 @@ const int windowY = 300;
 //プロジェクトのプロパティ⇒C/C++⇒全般　の追加のインクルードディレクトリに
 // 『C:\OpenCV2.3\include』を追加のこと
 int jump1,jump2,start=0,jump_r=0,jump_l=0;
+#define PI_OVER_180 0.0174532925
+
+int frame2=0;//障害物動かす用
+int frame3=0;//ジャンプ座標設定用
+int jumpout=0;//ジャンプ下降フラグ
+char key;
+int enemyx0,enemyx1,playerx0,playerx1,enemyy0,enemyy1,playery0,playery1;
+int keep;//空中待機時間
+int keepflag;//空中待機フラグ
+int speed = 6;//速さ
+int prespeed = 6;//予約速さ]
+int arive = 0;
+
+CvFont dfont;
+float hscale      = 0.3f;
+float vscale      = 0.3f;
+float italicscale = 0.0f;
+float  thickness    = 0.1;
+char text[100];
 
 using namespace std;
 //change
@@ -29,6 +49,214 @@ int frame=0;//スコア
 	IplImage* dst = 0;
 IplImage *imgB;
 
+void init(){
+	frame2=0;//障害物動かす用
+	frame3=0;//ジャンプ座標設定用
+	jumpout=0;//ジャンプ下降フラグ
+	if(rand()%2==0){
+		enemyx0=10;
+	}else{
+		enemyx0=windowX-30;
+	}
+	speed = 6;//速さ
+	prespeed = 6;//予約速さ
+	start =0;
+
+	hscale      = 0.3f;
+	vscale      = 0.3f;
+	italicscale = 0.0f;
+	thickness    = 0.1;
+
+	frame=0;//スコア初期化
+	arive=1;
+
+	glOrtho(0,windowX,windowY, 0, -1, 1);
+}
+
+void render_string(float x,float y, const char* string){
+  float z = 1.0f;
+  char* p;
+  glRasterPos3f(x,y,z);
+  p = (char*) string;
+  while(*p != '\0') glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18,*p++);
+}
+
+void square(int x, int y, int z, int w, int h, float r, float g, float b){
+	glColor3d(r, g, b);
+	glBegin(GL_QUADS);
+	glVertex3d(x, y, z);
+	glVertex3d(x, y+h, z);
+	glVertex3d(x+w, y+h, z);
+	glVertex3d(x+w, y, z);
+	glEnd();
+}
+
+/********** ここからメインループ ********************/
+inline void CV_MAIN_LOOP()
+{
+	if(arive==1){
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		fram = cvQueryFrame(capture);
+		GetMaskHSV(fram, mask, 1, 1);
+		cvAnd(fram, mask, dst);
+
+		cvLine(fram,cvPoint(0,jump1),cvPoint(fram->width,jump1),cvScalar(200,0,0),3, 4);     //わかりやすくラインひく
+		cvLine(fram,cvPoint(0,jump2),cvPoint(fram->width,jump2),cvScalar(200,0,0),3, 4);
+		cvLine(dst,cvPoint(0,jump1),cvPoint(fram->width,jump1),cvScalar(200,0,0),3, 4);  
+		cvLine(dst,cvPoint(0,jump2),cvPoint(fram->width,jump2),cvScalar(200,0,0),3, 4);
+
+		cvShowImage("src", fram);
+		cvShowImage("dst", dst);
+		c = cvWaitKey(10);
+		if(c == 'q') return;
+
+		cvInitFont (&dfont, CV_FONT_HERSHEY_COMPLEX, hscale, vscale,italicscale, thickness, CV_AA);
+	
+		sprintf(text,"SCORE:%d",frame);
+		render_string(230,30,text);
+
+		enemyx1=enemyx0+20;
+		playerx0=frame3+10;
+		playerx1=frame3+40;
+		enemyy0=frame2;
+		enemyy1=frame2+30;
+		playery0=windowY-30;
+		playery1=windowY-20;
+
+		square(0,0,0.5, 10, windowY,0.5,0.5,0.3);//壁 left
+		square(windowX-10,0,0.5,10,windowY,0.5,0.5,0.3);//壁 right
+		square(enemyx0,enemyy0,0.5, 20,30, 1.0,0.0,0.0);//障害物
+		square(playerx0,playery0,0.5,30,10, 1.0,1.0,0.0);//人
+	
+
+
+		//当たり判定
+		if((enemyx0<playerx1)&&(playerx0<enemyx1)&&(enemyy0<playery1)&&(playery0<enemyy1)){
+			//printf("the end1");
+			arive=0;
+		}
+		//当たり判定終わり
+
+		frame+=1;//スコア
+		frame2+=speed;
+		if(frame2>windowY+30){
+			frame2=0;
+			if(rand()%2==0){
+				enemyx0=10;
+			}else{
+				enemyx0=windowX-30;
+			}
+			speed=prespeed;
+		}
+		//ジャンプ
+		if(jump_r >= 1){
+			if(jump_l >= 1){
+				jump_r=0;
+			} else {
+				switch(speed){
+				case 6:
+						frame3+=6;//上昇
+						break;
+				case 9:
+						frame3+=9;//上昇
+						break;
+				case 12:
+						frame3+=12;//上昇
+						break;
+				}
+				if(frame3 > windowX-50){
+					frame3 = windowX-50;
+					jump_r = 0;//frame3が0ならジャンプフラグ消
+				}
+			}
+		
+		}
+
+		if(jump_l >= 1){
+			if(jump_r >= 1){
+				jump_l=0;
+			} else {
+				switch(speed){
+				case 6:
+						frame3-=6;//上昇
+						break;
+				case 9:
+						frame3-=9;//上昇
+						break;
+				case 12:
+						frame3-=12;//上昇
+						break;
+				}
+				if(frame3 < 0){
+					frame3 = 0;
+					jump_l = 0;//frame3が0ならジャンプフラグ消
+				}
+			}
+		
+		}
+
+	//ジャンプ終わり
+	glutSwapBuffers();
+	glutPostRedisplay();
+	} else {
+		CV_GAMEOVER();
+	}
+
+}
+
+//-----------------------------
+// キーボード処理
+//-----------------------------
+void keyboard(unsigned char key, int x, int y)
+{
+  switch (key)
+    {
+      // ESC キーが押されたらプログラム終了
+    case 27:
+      exit(0);
+      break;
+
+    case 'r':
+      init();
+      break;
+
+	case 'a':
+		prespeed=6;
+		break;
+	case 's':
+		prespeed=9;
+		break;
+	case 'd':
+		prespeed=12;
+		break;
+	case 'l':
+		jump_r=1;
+		break;
+	case 'k':
+		jump_l=1;
+		break;
+
+    }
+}
+
+//-----------------------------
+// 特殊キーの処理
+//-----------------------------
+void special(int key, int x, int y)
+{
+  double tmpx, tmpy;
+  int sign;
+  
+  switch (key)
+    {
+    case GLUT_KEY_RIGHT:
+		jump_r=1;
+		break;
+    case GLUT_KEY_LEFT:
+		jump_l=1;
+		break;
+    }
+}
 
 int main( int argc, char **argv)
 {
@@ -49,15 +277,22 @@ cvNamedWindow("dst", CV_WINDOW_AUTOSIZE);
 
 
 
+glutInit(&argc,argv);
+glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
+glutInitWindowPosition(300,200);
+glutInitWindowSize(windowX,windowY);
 
-imgB = cvCreateImage(window,IPL_DEPTH_8U,3);
-cvSet (imgB, cvScalarAll (255), 0);
+glutCreateWindow("Jumping Game");
+glClearColor(0.0,0.0,0.0,0.0);
 
+glutDisplayFunc(CV_MAIN_LOOP);
+glutKeyboardFunc(keyboard);
+glutSpecialFunc(special);
+init();
 
-cvNamedWindow("window",CV_WINDOW_AUTOSIZE);
-cvShowImage("window",imgB);
+glutMainLoop();
 
-CV_MAIN_LOOP();
+//CV_MAIN_LOOP();
 
 cvDestroyWindow("src");
 cvDestroyWindow("dst");
@@ -67,184 +302,13 @@ cvReleaseImage(&dst);
 cvReleaseImage(&mask);
 cvReleaseCapture(&capture);
 
-cvReleaseImage( &imgB );
-cvDestroyWindow("window");
 
 //return 0;
 exit(0);
 }
 
 
-/********** ここからメインループ ********************/
-inline void CV_MAIN_LOOP()
-{
 
-#define PI_OVER_180 0.0174532925
-
-int frame2=0;//障害物動かす用
-int frame3=0;//ジャンプ座標設定用
-int jumpout=0;//ジャンプ下降フラグ
-char key;
-int enemyx0,enemyx1,playerx0,playerx1,enemyy0,enemyy1,playery0,playery1;
-int keep;//空中待機時間
-int keepflag;//空中待機フラグ
-int speed = 6;//速さ
-int prespeed = 6;//予約速さ
-start =0;
-
-CvFont dfont;
-float hscale      = 0.3f;
-float vscale      = 0.3f;
-float italicscale = 0.0f;
-int  thickness    = 0.1;
-char text[100];
-
-frame=0;//スコア初期化
-
-if(rand()%2==0){
-	enemyx0=10;
-}else{
-	enemyx0=windowX-30;
-}
-
-while(1)
-{
-	//たそ
-			fram = cvQueryFrame(capture);
-		GetMaskHSV(fram, mask, 1, 1);
-		cvAnd(fram, mask, dst);
-
-		cvLine(fram,cvPoint(0,jump1),cvPoint(fram->width,jump1),cvScalar(200,0,0),3, 4);     //わかりやすくラインひく
-	    cvLine(fram,cvPoint(0,jump2),cvPoint(fram->width,jump2),cvScalar(200,0,0),3, 4);
-	    cvLine(dst,cvPoint(0,jump1),cvPoint(fram->width,jump1),cvScalar(200,0,0),3, 4);  
-	    cvLine(dst,cvPoint(0,jump2),cvPoint(fram->width,jump2),cvScalar(200,0,0),3, 4);
-
-	cvShowImage("src", fram);
-		cvShowImage("dst", dst);
-		c = cvWaitKey(10);
-		if(c == 'q') break;
-
-
-	//たそ終わり
-
-
-	cvInitFont (&dfont, CV_FONT_HERSHEY_COMPLEX, hscale, vscale,italicscale, thickness, CV_AA);
-	
-cvSet (imgB, cvScalarAll (255), 0);
-
-sprintf(text,"SCORE:%d",frame);
-
-
-enemyx1=enemyx0+20;
-playerx0=frame3+10;
-playerx1=frame3+40;
-enemyy0=frame2;
-enemyy1=frame2+30;
-playery0=windowY-30;
-playery1=windowY-20;
-cvRectangle(imgB, cvPoint(0,0), cvPoint(10,windowY), cvScalar(100,100,50),CV_FILLED);//壁 left
-cvRectangle(imgB, cvPoint(windowX-10,0),cvPoint(windowX,windowY),cvScalar(100,100,50),CV_FILLED);//壁 right
-cvRectangle(imgB, cvPoint(enemyx0,enemyy0), cvPoint(enemyx1,enemyy1), cvScalar(255,0,0),CV_FILLED);//障害物
-cvRectangle(imgB, cvPoint(playerx0,playery0), cvPoint(playerx1,playery1), cvScalar(255,255,0),CV_FILLED);//人
-cvPutText(imgB, text, cvPoint(230, 30),&dfont, CV_RGB(255, 0, 0));//スコア挿入
-
-
-cvShowImage("window",imgB);
-
-
-//当たり判定
-if((enemyx0<playerx1)&&(playerx0<enemyx1)&&(enemyy0<playery1)&&(playery0<enemyy1)){
-//	printf("the end1");
-	CV_GAMEOVER();
-}
-//当たり判定終わり
-
-//キーイベント
-key=(char)cvWaitKey(1);
-if(key=='\033') break;
-switch(key){
-case 'a':
-	prespeed=6;
-	break;
-case 's':
-	prespeed=9;
-	break;
-case 'd':
-	prespeed=12;
-	break;
-case 'l':
-	jump_r=1;
-	break;
-case 'k':
-	jump_l=1;
-	break;
-}
-//キーイベント終わり
-
-frame+=1;//スコア
-frame2+=speed;
-if(frame2>windowY+30){
-	frame2=0;
-	if(rand()%2==0){
-		enemyx0=10;
-	}else{
-		enemyx0=windowX-30;
-	}
-	speed=prespeed;
-}
-//ジャンプ
-if(jump_r >= 1){
-	if(jump_l >= 1){
-		jump_r=0;
-	} else {
-		switch(speed){
-		case 6:
-					frame3+=6;//上昇
-					break;
-		case 9:
-					frame3+=9;//上昇
-					break;
-		case 12:
-					frame3+=12;//上昇
-					break;
-		}
-		if(frame3 > windowX-50){
-			frame3 = windowX-50;
-			jump_r = 0;//frame3が0ならジャンプフラグ消
-		}
-	}
-		
-}
-
-if(jump_l >= 1){
-	if(jump_r >= 1){
-		jump_l=0;
-	} else {
-		switch(speed){
-		case 6:
-					frame3-=6;//上昇
-					break;
-		case 9:
-					frame3-=9;//上昇
-					break;
-		case 12:
-					frame3-=12;//上昇
-					break;
-		}
-		if(frame3 < 0){
-			frame3 = 0;
-			jump_l = 0;//frame3が0ならジャンプフラグ消
-		}
-	}
-		
-}
-
-//ジャンプ終わり
-
-
-}
-
-}
 
 
 inline void CV_GAMEOVER(){
@@ -266,24 +330,13 @@ char key;
 cvInitFont (&dfont2, CV_FONT_HERSHEY_COMPLEX, hscale2, vscale2,italicscale, thickness, CV_AA);	
 cvSet (imgB, cvScalarAll (255), 0);
 
-sprintf(text,"SCORE:%d",frame);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-cvPutText(imgB, text, cvPoint(85, 135),&dfont, CV_RGB(255, 0, 0));//スコア挿入
-cvPutText(imgB, "Restart:[r] , End:[Esc]", cvPoint(75, 165),&dfont2, CV_RGB(255, 0, 0));//キー説明
+  sprintf(text,"SCORE:%d",frame);
 
-cvShowImage("window",imgB);
-
-
-
-//キーイベント
-key=(char)cvWaitKey(10000);
-if(key=='\033'){ 
-	exit(1);
-}
-if(key=='r'){
-	CV_MAIN_LOOP();
-}
-//キーイベント終わり
+  render_string(85,135, text);//スコア挿入
+  render_string(75,165,"Restart:[r] , End:[Esc]");//キー説明
+  glutSwapBuffers();
 
 
 }
