@@ -70,7 +70,8 @@ cvReleaseCapture(&capture);
 cvReleaseImage( &imgB );
 cvDestroyWindow("window");
 
-return 0;
+//return 0;
+exit(0);
 }
 
 
@@ -84,7 +85,7 @@ int frame2=0;//障害物動かす用
 int frame3=0;//ジャンプ座標設定用
 int jumpout=0;//ジャンプ下降フラグ
 char key;
-int x0,x1,x2,x3,y0,y1,y2,y3;
+int enemyx0,enemyx1,playerx0,playerx1,enemyy0,enemyy1,playery0,playery1;
 int keep;//空中待機時間
 int keepflag;//空中待機フラグ
 int speed = 6;//速さ
@@ -92,13 +93,19 @@ int prespeed = 6;//予約速さ
 start =0;
 
 CvFont dfont;
-    float hscale      = 0.3f;
-    float vscale      = 0.3f;
-    float italicscale = 0.0f;
-    int  thickness    = 0.1;
-    char text[100];
+float hscale      = 0.3f;
+float vscale      = 0.3f;
+float italicscale = 0.0f;
+int  thickness    = 0.1;
+char text[100];
 
-	frame=0;//スコア初期化
+frame=0;//スコア初期化
+
+if(rand()%2==0){
+	enemyx0=10;
+}else{
+	enemyx0=windowX-30;
+}
 
 while(1)
 {
@@ -127,18 +134,18 @@ cvSet (imgB, cvScalarAll (255), 0);
 
 sprintf(text,"SCORE:%d",frame);
 
-x0=10;
-x1=30;
-x2=frame3+10;
-x3=frame3+40;
-y0=frame2;
-y1=frame2+30;
-y2=windowY-30;
-y3=windowY-20;
-cvRectangle(imgB, cvPoint(0,0), cvPoint(10,windowY), cvScalar(100,100,50),CV_FILLED);//壁
-cvRectangle(imgB, cvPoint(windowX-10,0),cvPoint(windowX,windowY),cvScalar(100,100,50),CV_FILLED);//壁
-cvRectangle(imgB, cvPoint(x0,y0), cvPoint(x1,y1), cvScalar(255,0,0),CV_FILLED);//障害物
-cvRectangle(imgB, cvPoint(x2,y2), cvPoint(x3,y3), cvScalar(255,255,0),CV_FILLED);//人
+
+enemyx1=enemyx0+20;
+playerx0=frame3+10;
+playerx1=frame3+40;
+enemyy0=frame2;
+enemyy1=frame2+30;
+playery0=windowY-30;
+playery1=windowY-20;
+cvRectangle(imgB, cvPoint(0,0), cvPoint(10,windowY), cvScalar(100,100,50),CV_FILLED);//壁 left
+cvRectangle(imgB, cvPoint(windowX-10,0),cvPoint(windowX,windowY),cvScalar(100,100,50),CV_FILLED);//壁 right
+cvRectangle(imgB, cvPoint(enemyx0,enemyy0), cvPoint(enemyx1,enemyy1), cvScalar(255,0,0),CV_FILLED);//障害物
+cvRectangle(imgB, cvPoint(playerx0,playery0), cvPoint(playerx1,playery1), cvScalar(255,255,0),CV_FILLED);//人
 cvPutText(imgB, text, cvPoint(230, 30),&dfont, CV_RGB(255, 0, 0));//スコア挿入
 
 
@@ -146,8 +153,8 @@ cvShowImage("window",imgB);
 
 
 //当たり判定
-if((x0<x3)&&(x2<x1)&&(y0<y3)&&(y2<y1)){
-	printf("the end1");
+if((enemyx0<playerx1)&&(playerx0<enemyx1)&&(enemyy0<playery1)&&(playery0<enemyy1)){
+//	printf("the end1");
 	CV_GAMEOVER();
 }
 //当たり判定終わり
@@ -178,28 +185,33 @@ frame+=1;//スコア
 frame2+=speed;
 if(frame2>windowY+30){
 	frame2=0;
+	if(rand()%2==0){
+		enemyx0=10;
+	}else{
+		enemyx0=windowX-30;
+	}
 	speed=prespeed;
 }
 //ジャンプ
 if(jump_r >= 1){
 	if(jump_l >= 1){
 		jump_r=0;
-		break;
-	}
-	switch(speed){
-	case 6:
-				frame3+=6;//上昇
-				break;
-	case 9:
-				frame3+=9;//上昇
-				break;
-	case 12:
-				frame3+=12;//上昇
-				break;
-	}
-	if(frame3 > windowX-50){
-	frame3 = windowX-50;
-	jump_r = 0;//frame3が0ならジャンプフラグ消
+	} else {
+		switch(speed){
+		case 6:
+					frame3+=6;//上昇
+					break;
+		case 9:
+					frame3+=9;//上昇
+					break;
+		case 12:
+					frame3+=12;//上昇
+					break;
+		}
+		if(frame3 > windowX-50){
+			frame3 = windowX-50;
+			jump_r = 0;//frame3が0ならジャンプフラグ消
+		}
 	}
 		
 }
@@ -207,22 +219,22 @@ if(jump_r >= 1){
 if(jump_l >= 1){
 	if(jump_r >= 1){
 		jump_l=0;
-		break;
-	}
-	switch(speed){
-	case 6:
-				frame3-=6;//上昇
-				break;
-	case 9:
-				frame3-=9;//上昇
-				break;
-	case 12:
-				frame3-=12;//上昇
-				break;
-	}
-	if(frame3 < 0){
-	frame3 = 0;
-	jump_l = 0;//frame3が0ならジャンプフラグ消
+	} else {
+		switch(speed){
+		case 6:
+					frame3-=6;//上昇
+					break;
+		case 9:
+					frame3-=9;//上昇
+					break;
+		case 12:
+					frame3-=12;//上昇
+					break;
+		}
+		if(frame3 < 0){
+			frame3 = 0;
+			jump_l = 0;//frame3が0ならジャンプフラグ消
+		}
 	}
 		
 }
@@ -247,7 +259,6 @@ char key;
 	CvFont dfont2;
     float hscale2      = 0.4f;
     float vscale2      = 0.4f;
-
 	
 	jump_r = 0;
 	jump_l = 0;
@@ -258,7 +269,7 @@ cvSet (imgB, cvScalarAll (255), 0);
 sprintf(text,"SCORE:%d",frame);
 
 cvPutText(imgB, text, cvPoint(85, 135),&dfont, CV_RGB(255, 0, 0));//スコア挿入
-cvPutText(imgB, "Resetart:[r] , End:[Esc]", cvPoint(75, 165),&dfont2, CV_RGB(255, 0, 0));//キー説明
+cvPutText(imgB, "Restart:[r] , End:[Esc]", cvPoint(75, 165),&dfont2, CV_RGB(255, 0, 0));//キー説明
 
 cvShowImage("window",imgB);
 
