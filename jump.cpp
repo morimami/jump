@@ -18,12 +18,14 @@ int frame2=0;//障害物動かす用
 int frame3=0;//ジャンプ座標設定用
 int jumpout=0;//ジャンプ下降フラグ
 char key;
-int enemyx0,enemyx1,playerx0,playerx1,enemyy0,enemyy1,playery0,playery1;
+int enemyx0=10,enemyx1,playerx0,playerx1,enemyy0,enemyy1,playery0,playery1;
 int keep;//空中待機時間
 int keepflag;//空中待機フラグ
 int speed = 6;//速さ
 int prespeed = 6;//予約速さ]
-int arive = 0;
+int arive = 1;
+int restart;
+int winID;
 
 CvFont dfont;
 float hscale      = 0.3f;
@@ -49,32 +51,13 @@ int frame=0;//スコア
 	IplImage* dst = 0;
 IplImage *imgB;
 
+
 void init(){
-	frame2=0;//障害物動かす用
-	frame3=0;//ジャンプ座標設定用
-	jumpout=0;//ジャンプ下降フラグ
-	if(rand()%2==0){
-		enemyx0=10;
-	}else{
-		enemyx0=windowX-30;
-	}
-	speed = 6;//速さ
-	prespeed = 6;//予約速さ
-	start =0;
 
-	hscale      = 0.3f;
-	vscale      = 0.3f;
-	italicscale = 0.0f;
-	thickness    = 0.1;
-
-	frame=0;//スコア初期化
-	arive=1;
-
-	glOrtho(0,windowX,windowY, 0, -1, 1);
 }
 
 void render_string(float x,float y, const char* string){
-  float z = 1.0f;
+  float z = -1.0f;
   char* p;
   glRasterPos3f(x,y,z);
   p = (char*) string;
@@ -84,16 +67,41 @@ void render_string(float x,float y, const char* string){
 void square(int x, int y, int z, int w, int h, float r, float g, float b){
 	glColor3d(r, g, b);
 	glBegin(GL_QUADS);
-	glVertex3d(x, y, z);
-	glVertex3d(x, y+h, z);
-	glVertex3d(x+w, y+h, z);
-	glVertex3d(x+w, y, z);
+	/*glTexCoord2f(0, 0);*/ glVertex3d(x, y, z);
+	/*glTexCoord2f(0, 1);*/ glVertex3d(x, y+h, z);
+	/*glTexCoord2f(1, 1);*/ glVertex3d(x+w, y+h, z);
+	/*glTexCoord2f(1, 0);*/ glVertex3d(x+w, y, z);
 	glEnd();
 }
 
 /********** ここからメインループ ********************/
 inline void CV_MAIN_LOOP()
 {
+
+	if(restart == 1){
+		frame2=0;//障害物動かす用
+		frame3=0;//ジャンプ座標設定用
+		jumpout=0;//ジャンプ下降フラグ
+
+		speed = 6;//速さ
+		prespeed = 6;//予約速さ
+		start =0;
+
+		hscale      = 0.3f;
+		vscale      = 0.3f;
+		italicscale = 0.0f;
+		thickness    = 0.1;
+
+		frame=0;//スコア初期化
+		arive=1;
+		if(rand()%2==0){
+			enemyx0=10;
+		}else{
+			enemyx0=windowX-30;
+		}
+		restart = 0;
+	}
+
 	if(arive==1){
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		fram = cvQueryFrame(capture);
@@ -113,7 +121,7 @@ inline void CV_MAIN_LOOP()
 		cvInitFont (&dfont, CV_FONT_HERSHEY_COMPLEX, hscale, vscale,italicscale, thickness, CV_AA);
 	
 		sprintf(text,"SCORE:%d",frame);
-		render_string(230,30,text);
+		render_string(20,30,text);
 
 		enemyx1=enemyx0+20;
 		playerx0=frame3+10;
@@ -199,9 +207,31 @@ inline void CV_MAIN_LOOP()
 	glutSwapBuffers();
 	glutPostRedisplay();
 	} else {
-		CV_GAMEOVER();
+//		CV_GAMEOVER();
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		sprintf(text,"SCORE:%d",frame);
+
+		render_string(85,135, text);//スコア挿入
+		render_string(75,165,"Restart:[r] , End:[Esc]");//キー説明
+		glutSwapBuffers();
+		glutPostRedisplay();
 	}
 
+}
+
+void myexit(int i){
+	cvDestroyWindow("src");
+	cvDestroyWindow("dst");
+	glutDestroyWindow(winID);
+	cvReleaseImage(&fram);
+	cvReleaseImage(&dst);
+	cvReleaseImage(&mask);
+//	cvReleaseCapture(&capture);
+
+
+//return 0;
+	exit(i);
 }
 
 //-----------------------------
@@ -213,12 +243,12 @@ void keyboard(unsigned char key, int x, int y)
     {
       // ESC キーが押されたらプログラム終了
     case 27:
-      exit(0);
+      myexit(0);
       break;
 
     case 'r':
-      init();
-      break;
+		restart=1;
+		break;
 
 	case 'a':
 		prespeed=6;
@@ -258,6 +288,8 @@ void special(int key, int x, int y)
     }
 }
 
+
+
 int main( int argc, char **argv)
 {
 
@@ -282,7 +314,8 @@ glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
 glutInitWindowPosition(300,200);
 glutInitWindowSize(windowX,windowY);
 
-glutCreateWindow("Jumping Game");
+
+winID = glutCreateWindow("Jumping Game");
 glClearColor(0.0,0.0,0.0,0.0);
 
 glutDisplayFunc(CV_MAIN_LOOP);
@@ -290,13 +323,14 @@ glutKeyboardFunc(keyboard);
 glutSpecialFunc(special);
 init();
 
+glOrtho(0,windowX,windowY, 0, -1, 1);
 glutMainLoop();
 
 //CV_MAIN_LOOP();
 
 cvDestroyWindow("src");
 cvDestroyWindow("dst");
-
+glutDestroyWindow(glutGetWindow());
 cvReleaseImage(&fram);
 cvReleaseImage(&dst);
 cvReleaseImage(&mask);
@@ -307,11 +341,7 @@ cvReleaseCapture(&capture);
 exit(0);
 }
 
-
-
-
-
-inline void CV_GAMEOVER(){
+void CV_GAMEOVER(){
 char key;
 	CvFont dfont;
     float hscale      =	0.7f;
@@ -330,13 +360,7 @@ char key;
 cvInitFont (&dfont2, CV_FONT_HERSHEY_COMPLEX, hscale2, vscale2,italicscale, thickness, CV_AA);	
 cvSet (imgB, cvScalarAll (255), 0);
 
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  sprintf(text,"SCORE:%d",frame);
-
-  render_string(85,135, text);//スコア挿入
-  render_string(75,165,"Restart:[r] , End:[Esc]");//キー説明
-  glutSwapBuffers();
 
 
 }
