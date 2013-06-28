@@ -50,10 +50,86 @@ int frame=0;//スコア
 	IplImage* mask = 0;
 	IplImage* dst = 0;
 IplImage *imgB;
+GLuint texName[4];
+GLubyte texImage[4][64][64][4];
 
+struct TEXRGB{
+	int R;
+	int G;
+	int B;
+	int A;
+};
+
+TEXRGB* texrgb[4];
+
+void loadTex(char* filename,TEXRGB* texrgb){
+
+	char type[2]={0};
+	int size=0;
+	int aa=0;
+	int offset = 0;
+	int bb=0;
+	int size1=0;
+	int size4=0;
+
+	FILE* fp;
+	fopen_s(&fp,filename,"rb");
+
+	char R;
+	char G;
+	char B;
+
+	fread(type,sizeof(char),2,fp);
+	fread(&size,4,1,fp);
+	fread(&aa,2,1,fp);
+	fread(&aa,2,1,fp);
+	fread(&offset,4,1,fp);
+//	fseek(fp,0,SEEK_SET);
+	size1 = (size-offset)/3;
+
+	for(int i=0; i<size1; i++){
+		fread(&B,1,1,fp);
+		fread(&G,1,1,fp);
+		fread(&R,1,1,fp);
+
+		texImage[0][i/64][i%64][0]=(int)R;
+		texImage[0][i/64][i%64][1]=(int)G;
+		texImage[0][i/64][i%64][2]=(int)B;
+		texImage[0][i/64][i%64][3]=255;
+	}
+}
 
 void init(){
-
+	glGenTextures(4,texName);
+	for (int i=0; i<3; i++) {
+		glBindTexture(GL_TEXTURE_2D, texName[i]);
+		switch(i){
+		case 0:
+			loadTex("wall.bmp",texrgb[i]);
+			break;
+		default:
+			loadTex("wall.bmp",texrgb[i]);
+			break;
+		}
+		/*
+		for (int j=0; j<64; j++) {
+			for (int k=0; k<64; k++) {
+				texImage[i][j][k][0] = texrgb[i][j*64+k].R;
+				texImage[i][j][k][1] = texrgb[i][j*64+k].G;
+				texImage[i][j][k][2] = texrgb[i][j*64+k].B;
+				texImage[i][j][k][3] = 255;
+			}
+		}
+		*/
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,GL_REPEAT);
+		glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+		glTexImage2D(GL_TEXTURE_2D, 0, 3, 8, 8, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                 &texImage[0]);
+	}
+	glEnable(GL_TEXTURE_2D);
 }
 
 void render_string(float x,float y, const char* string){
@@ -64,13 +140,13 @@ void render_string(float x,float y, const char* string){
   while(*p != '\0') glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18,*p++);
 }
 
-void square(int x, int y, int z, int w, int h, float r, float g, float b){
-	glColor3d(r, g, b);
+void square(int x, int y, int z, int w, int h, int tx,int ty){
+	glColor3d(1.0,1.0,1.0);
 	glBegin(GL_QUADS);
-	/*glTexCoord2f(0, 0);*/ glVertex3d(x, y, z);
-	/*glTexCoord2f(0, 1);*/ glVertex3d(x, y+h, z);
-	/*glTexCoord2f(1, 1);*/ glVertex3d(x+w, y+h, z);
-	/*glTexCoord2f(1, 0);*/ glVertex3d(x+w, y, z);
+	glTexCoord2f(0, 0); glVertex3d(x, y, z);
+	glTexCoord2f(0, ty); glVertex3d(x, y+h, z);
+	glTexCoord2f(tx, ty); glVertex3d(x+w, y+h, z);
+	glTexCoord2f(tx, 0); glVertex3d(x+w, y, z);
 	glEnd();
 }
 
@@ -131,10 +207,11 @@ inline void CV_MAIN_LOOP()
 		playery0=windowY-30;
 		playery1=windowY-20;
 
-		square(0,0,0.5, 10, windowY,0.5,0.5,0.3);//壁 left
-		square(windowX-10,0,0.5,10,windowY,0.5,0.5,0.3);//壁 right
-		square(enemyx0,enemyy0,0.5, 20,30, 1.0,0.0,0.0);//障害物
-		square(playerx0,playery0,0.5,30,10, 1.0,1.0,0.0);//人
+		glBindTexture(GL_TEXTURE_2D,texName[0]);
+		square(0,0,0.5, 10, windowY,1,30);//壁 left
+		square(windowX-10,0,0.5,10,windowY,1,30);//壁 right
+		square(enemyx0,enemyy0,0.5, 20,30, 1,1);//障害物
+		square(playerx0,playery0,0.5,30,10, 1,1);//人
 	
 
 
