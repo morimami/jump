@@ -6,19 +6,24 @@
 #include <cmath>
 #include <iostream>
 
-const int windowX = 300;
-const int windowY = 300;
+const int windowX = 400;
+const int windowY = 400;
+const int enemyW=50;
+const int enemyH=70;
+const int playerW=30;
+const int playerH=10;
+const int wallW=30;
 
 //プロジェクトのプロパティ⇒C/C++⇒全般　の追加のインクルードディレクトリに
 // 『C:\OpenCV2.3\include』を追加のこと
 int jump1,jump2,start=0,jump_r=0,jump_l=0;
 #define PI_OVER_180 0.0174532925
 
-int frame2=0;//障害物動かす用
-int frame3=0;//ジャンプ座標設定用
+int frame2=-enemyH;//障害物動かす用
+int frame3=wallW;//ジャンプ座標設定用
 int jumpout=0;//ジャンプ下降フラグ
 char key;
-int enemyx0=10,enemyx1,playerx0,playerx1,enemyy0,enemyy1,playery0,playery1;
+int enemyx0=frame3-5,enemyx1,playerx0,playerx1,enemyy0,enemyy1,playery0,playery1;
 int keep;//空中待機時間
 int keepflag;//空中待機フラグ
 int speed = 6;//速さ
@@ -50,65 +55,76 @@ int frame=0;//スコア
 	IplImage* mask = 0;
 	IplImage* dst = 0;
 IplImage *imgB;
-GLuint texName[4];
-GLubyte texImage[4][64][64][4];
+GLuint texName[5];
+GLubyte texImage[5][64][64][4];
 
-struct TEXRGB{
-	int R;
-	int G;
-	int B;
-	int A;
-};
 
-TEXRGB* texrgb[4];
+IplImage *GetMaskFromRGB(IplImage *RGBImg){
+	IplImage *gray = cvCreateImage(cvGetSize(RGBImg),IPL_DEPTH_8U,1);
+	if(gray==NULL){return NULL;}
 
-void loadTex(char* filename,TEXRGB* texrgb){
+	cvCvtColor(RGBImg,gray,CV_RGB2GRAY);
 
-	char type[2]={0};
-	int size=0;
-	int aa=0;
-	int offset = 0;
-	int bb=0;
-	int size1=0;
-	int size4=0;
-
-	FILE* fp;
-	fopen_s(&fp,filename,"rb");
-
-	char R;
-	char G;
-	char B;
-
-	fread(type,sizeof(char),2,fp);
-	fread(&size,4,1,fp);
-	fread(&aa,2,1,fp);
-	fread(&aa,2,1,fp);
-	fread(&offset,4,1,fp);
-//	fseek(fp,0,SEEK_SET);
-	size1 = (size-offset)/3;
-
-	for(int i=0; i<size1; i++){
-		fread(&B,1,1,fp);
-		fread(&G,1,1,fp);
-		fread(&R,1,1,fp);
-
-		texImage[0][i/64][i%64][0]=(int)R;
-		texImage[0][i/64][i%64][1]=(int)G;
-		texImage[0][i/64][i%64][2]=(int)B;
-		texImage[0][i/64][i%64][3]=255;
-	}
+	cvThreshold(gray,gray,250,255,CV_THRESH_BINARY);
+	cvNot(gray,gray);
+	return gray;
 }
 
+IplImage *loadImageRGBA(const char *filename){
+	IplImage *img = cvLoadImage(filename,1);
+	cvCvtColor(img,img,CV_BGR2RGB);
+	if(img == NULL){
+		return NULL;
+	}
+
+	IplImage *mask = GetMaskFromRGB(img);
+	if(mask == NULL){
+		cvReleaseImage(&img);
+		return NULL;
+	}
+
+	IplImage *RGBA = cvCreateImage(cvGetSize(img),IPL_DEPTH_8U,4);
+	if(RGBA == NULL){
+		cvReleaseImage(&img);
+		cvReleaseImage(&mask);
+		return NULL;
+	}
+
+	const CvArr *InputPlane[2]={img,mask};
+	int from_to[] = {0,0,1,1,2,2,3,3};
+
+	cvMixChannels(InputPlane,2,(CvArr**)&RGBA,1,from_to,4);
+
+	cvReleaseImage(&mask);
+	cvReleaseImage(&img);
+
+	return RGBA;
+}
+
+
+
+
 void init(){
-	glGenTextures(4,texName);
-	for (int i=0; i<3; i++) {
+	glGenTextures(5,texName);
+	char* filename;
+	IplImage *img;
+	for (int i=0; i<4; i++) {
 		glBindTexture(GL_TEXTURE_2D, texName[i]);
 		switch(i){
 		case 0:
-			loadTex("wall.bmp",texrgb[i]);
+			filename="wall.png";
+			break;
+		case 1:
+			filename="tako.png";
+			break;
+		case 2:
+			filename="sky.png";
+			break;
+		case 3:
+			filename="tako2.png";
 			break;
 		default:
-			loadTex("wall.bmp",texrgb[i]);
+			filename="wall.png";
 			break;
 		}
 		/*
@@ -121,32 +137,43 @@ void init(){
 			}
 		}
 		*/
+//		img = cvLoadImage(filename,CV_LOAD_IMAGE_ANYDEPTH | CV_LOAD_IMAGE_ANYCOLOR);
+		img = loadImageRGBA(filename);
+		if(img == NULL){
+			
+		}
+//		cvCvtColor(img,img,CV_BGR2RGB);
+		cvFlip(img, NULL, 0);
 		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,GL_REPEAT);
 		glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-		glTexImage2D(GL_TEXTURE_2D, 0, 3, 8, 8, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                 &texImage[0]);
+//		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img->width, img->height,0,GL_RGB,GL_UNSIGNED_BYTE,img->imageData);
+		gluBuild2DMipmaps(GL_TEXTURE_2D,4,img->width,img->height,GL_RGBA,GL_UNSIGNED_BYTE,img->imageData);
+		cvReleaseImage(&img);
 	}
 	glEnable(GL_TEXTURE_2D);
+	glEnable(GL_ALPHA_TEST);
+	glEnable(GL_DEPTH_TEST);
+	glAlphaFunc(GL_GREATER, 0);
 }
 
 void render_string(float x,float y, const char* string){
-  float z = -1.0f;
+  float z = 1.0f;
   char* p;
   glRasterPos3f(x,y,z);
   p = (char*) string;
   while(*p != '\0') glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18,*p++);
 }
 
-void square(int x, int y, int z, int w, int h, int tx,int ty){
+void square(int x, int y, int z, int w, int h, int tx,float ty,float ty0){
 	glColor3d(1.0,1.0,1.0);
 	glBegin(GL_QUADS);
-	glTexCoord2f(0, 0); glVertex3d(x, y, z);
-	glTexCoord2f(0, ty); glVertex3d(x, y+h, z);
-	glTexCoord2f(tx, ty); glVertex3d(x+w, y+h, z);
-	glTexCoord2f(tx, 0); glVertex3d(x+w, y, z);
+	glTexCoord2f(0, -ty0); glVertex3d(x, y, z);
+	glTexCoord2f(0, -ty0+ty); glVertex3d(x, y+h, z);
+	glTexCoord2f(tx, -ty0+ty); glVertex3d(x+w, y+h, z);
+	glTexCoord2f(tx, -ty0); glVertex3d(x+w, y, z);
 	glEnd();
 }
 
@@ -155,8 +182,8 @@ inline void CV_MAIN_LOOP()
 {
 
 	if(restart == 1){
-		frame2=0;//障害物動かす用
-		frame3=0;//ジャンプ座標設定用
+		frame2=-enemyH;//障害物動かす用
+		frame3=wallW;//ジャンプ座標設定用
 		jumpout=0;//ジャンプ下降フラグ
 
 		speed = 6;//速さ
@@ -171,9 +198,9 @@ inline void CV_MAIN_LOOP()
 		frame=0;//スコア初期化
 		arive=1;
 		if(rand()%2==0){
-			enemyx0=10;
+			enemyx0=wallW-5;
 		}else{
-			enemyx0=windowX-30;
+			enemyx0=windowX-enemyW-wallW+5;
 		}
 		restart = 0;
 	}
@@ -199,19 +226,29 @@ inline void CV_MAIN_LOOP()
 		sprintf(text,"SCORE:%d",frame);
 		render_string(20,30,text);
 
-		enemyx1=enemyx0+20;
-		playerx0=frame3+10;
-		playerx1=frame3+40;
+		enemyx1=enemyx0+enemyW;
+		playerx0=frame3;
+		playerx1=frame3+enemyH;
 		enemyy0=frame2;
-		enemyy1=frame2+30;
+		enemyy1=frame2+enemyH;
 		playery0=windowY-30;
-		playery1=windowY-20;
-
+		playery1=windowY-30+playerH;
+		
+		glBindTexture(GL_TEXTURE_2D,texName[2]);
+		square(0,0,-1,windowX,windowY,1,1,0); //背景
 		glBindTexture(GL_TEXTURE_2D,texName[0]);
-		square(0,0,0.5, 10, windowY,1,30);//壁 left
-		square(windowX-10,0,0.5,10,windowY,1,30);//壁 right
-		square(enemyx0,enemyy0,0.5, 20,30, 1,1);//障害物
-		square(playerx0,playery0,0.5,30,10, 1,1);//人
+		float ty=(float)windowY/(float)wallW;
+		float ty0=(float)frame2/(float)wallW;
+		square(0,0,0.5, wallW, windowY,1,ty,ty0);//壁 left
+		square(windowX-wallW,0,0.5,wallW,windowY,1,ty,ty0);//壁 right
+		if(enemyx0==windowX-enemyW-wallW+5){
+			glBindTexture(GL_TEXTURE_2D,texName[3]);
+		} else {
+			glBindTexture(GL_TEXTURE_2D,texName[1]);
+		}
+		square(enemyx0,enemyy0,0.4, enemyW,enemyH, 1,1,0);//障害物
+		glBindTexture(GL_TEXTURE_2D,texName[0]);
+		square(playerx0,playery0,0.5,playerW,playerH, 1,1,0);//人
 	
 
 
@@ -224,12 +261,12 @@ inline void CV_MAIN_LOOP()
 
 		frame+=1;//スコア
 		frame2+=speed;
-		if(frame2>windowY+30){
-			frame2=0;
+		if(frame2>windowY+enemyH){
+			frame2=-enemyH;
 			if(rand()%2==0){
-				enemyx0=10;
+				enemyx0=wallW-5;
 			}else{
-				enemyx0=windowX-30;
+				enemyx0=windowX-enemyW-wallW+5;
 			}
 			speed=prespeed;
 		}
@@ -249,8 +286,8 @@ inline void CV_MAIN_LOOP()
 						frame3+=12;//上昇
 						break;
 				}
-				if(frame3 > windowX-50){
-					frame3 = windowX-50;
+				if(frame3 > windowX-playerW-wallW){
+					frame3 = windowX-playerW-wallW;
 					jump_r = 0;//frame3が0ならジャンプフラグ消
 				}
 			}
@@ -272,8 +309,8 @@ inline void CV_MAIN_LOOP()
 						frame3-=12;//上昇
 						break;
 				}
-				if(frame3 < 0){
-					frame3 = 0;
+				if(frame3 < wallW){
+					frame3 = wallW;
 					jump_l = 0;//frame3が0ならジャンプフラグ消
 				}
 			}
@@ -393,7 +430,7 @@ glutInitWindowSize(windowX,windowY);
 
 
 winID = glutCreateWindow("Jumping Game");
-glClearColor(0.0,0.0,0.0,0.0);
+glClearColor(1.0,1.0,1.0,1.0);
 
 glutDisplayFunc(CV_MAIN_LOOP);
 glutKeyboardFunc(keyboard);
