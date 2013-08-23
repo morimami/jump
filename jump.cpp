@@ -10,8 +10,8 @@ const int windowX = 400;
 const int windowY = 400;
 const int enemyW=50;
 const int enemyH=70;
-const int playerW=30;
-const int playerH=10;
+const int playerW=40;
+const int playerH=40;
 const int wallW=30;
 
 //プロジェクトのプロパティ⇒C/C++⇒全般　の追加のインクルードディレクトリに
@@ -26,11 +26,13 @@ char key;
 int enemyx0=frame3-5,enemyx1,playerx0,playerx1,enemyy0,enemyy1,playery0,playery1;
 int keep;//空中待機時間
 int keepflag;//空中待機フラグ
-int speed = 6;//速さ
+float speed = 6;//速さ
 int prespeed = 6;//予約速さ]
-int arive = 1;
+int arive = 0;
 int restart;
 int winID;
+int winsize;
+int title=1;
 
 CvFont dfont;
 float hscale      = 0.3f;
@@ -55,8 +57,8 @@ int frame=0;//スコア
 	IplImage* mask = 0;
 	IplImage* dst = 0;
 IplImage *imgB;
-GLuint texName[5];
-GLubyte texImage[5][64][64][4];
+GLuint texName[6];
+GLubyte texImage[6][64][64][4];
 
 
 IplImage *GetMaskFromRGB(IplImage *RGBImg){
@@ -108,7 +110,7 @@ void init(){
 	glGenTextures(5,texName);
 	char* filename;
 	IplImage *img;
-	for (int i=0; i<4; i++) {
+	for (int i=0; i<6; i++) {
 		glBindTexture(GL_TEXTURE_2D, texName[i]);
 		switch(i){
 		case 0:
@@ -121,10 +123,15 @@ void init(){
 			filename="sky.png";
 			break;
 		case 3:
-			filename="tako2.png";
+			filename="ninja1.png";
+			break;
+		case 4:
+			filename="ninja2.png";
+			break;
+		case 5:
+			filename="result.png";
 			break;
 		default:
-			filename="wall.png";
 			break;
 		}
 		/*
@@ -159,12 +166,19 @@ void init(){
 	glAlphaFunc(GL_GREATER, 0);
 }
 
-void render_string(float x,float y, const char* string){
+void render_str(float x,float y, const char* string){
   float z = 1.0f;
   char* p;
-  glRasterPos3f(x,y,z);
   p = (char*) string;
-  while(*p != '\0') glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18,*p++);
+  glDisable(GL_TEXTURE_2D);
+//  std::cout << p << endl;
+   //glRasterPos3f(x,y,z);
+  glPushMatrix();
+  glTranslatef(x,y,z);
+  glScalef(0.2*(float)winsize/windowX,-0.2*	(float)winsize/windowY,1.0);
+  while(*p != '\0') glutStrokeCharacter(GLUT_STROKE_ROMAN,*p++);
+  glPopMatrix();
+  glEnable(GL_TEXTURE_2D);
 }
 
 void square(int x, int y, int z, int w, int h, int tx,float ty,float ty0){
@@ -202,10 +216,13 @@ inline void CV_MAIN_LOOP()
 		}else{
 			enemyx0=windowX-enemyW-wallW+5;
 		}
+		jump_r=0;
+		jump_l=0;
 		restart = 0;
 	}
 
 	if(arive==1){
+		speed+=0.005;
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		fram = cvQueryFrame(capture);
 		GetMaskHSV(fram, mask, 1, 1);
@@ -224,15 +241,16 @@ inline void CV_MAIN_LOOP()
 		cvInitFont (&dfont, CV_FONT_HERSHEY_COMPLEX, hscale, vscale,italicscale, thickness, CV_AA);
 	
 		sprintf(text,"SCORE:%d",frame);
-		render_string(20,30,text);
+        glColor3d(0.0, 0.0, 0.0);
+		render_str(30,30,text);
 
 		enemyx1=enemyx0+enemyW;
 		playerx0=frame3;
 		playerx1=frame3+enemyH;
 		enemyy0=frame2;
 		enemyy1=frame2+enemyH;
-		playery0=windowY-30;
-		playery1=windowY-30+playerH;
+		playery0=windowY-50;
+		playery1=windowY-50+playerH;
 		
 		glBindTexture(GL_TEXTURE_2D,texName[2]);
 		square(0,0,-1,windowX,windowY,1,1,0); //背景
@@ -241,14 +259,25 @@ inline void CV_MAIN_LOOP()
 		float ty0=(float)frame2/(float)wallW;
 		square(0,0,0.5, wallW, windowY,1,ty,ty0);//壁 left
 		square(windowX-wallW,0,0.5,wallW,windowY,1,ty,ty0);//壁 right
+		glBindTexture(GL_TEXTURE_2D,texName[1]);
 		if(enemyx0==windowX-enemyW-wallW+5){
-			glBindTexture(GL_TEXTURE_2D,texName[3]);
+			square(enemyx0,enemyy0,0.4, enemyW,enemyH, -1,1,0);//障害物
 		} else {
-			glBindTexture(GL_TEXTURE_2D,texName[1]);
+			square(enemyx0,enemyy0,0.4, enemyW,enemyH, 1,1,0);//障害物
 		}
-		square(enemyx0,enemyy0,0.4, enemyW,enemyH, 1,1,0);//障害物
-		glBindTexture(GL_TEXTURE_2D,texName[0]);
-		square(playerx0,playery0,0.5,playerW,playerH, 1,1,0);//人
+		if(jump_r>=1){
+			glBindTexture(GL_TEXTURE_2D,texName[3]);
+			square(playerx0,playery0,0.5,playerW,playerH,-1,1,0);//人
+		} else if(jump_l>=1){
+			glBindTexture(GL_TEXTURE_2D,texName[3]);
+			square(playerx0,playery0,0.5,playerW,playerH,1,1,0);
+		} else if(playerx0==windowX-playerW-wallW){
+			glBindTexture(GL_TEXTURE_2D,texName[4]);
+			square(playerx0+(rand()%2),playery0+(rand()%2),0.5,playerW,playerH,-1,1,0);
+		} else {
+			glBindTexture(GL_TEXTURE_2D,texName[4]);
+			square(playerx0+(rand()%2),playery0+(rand()%2),0.5,playerW,playerH,1,1,0);
+		}
 	
 
 
@@ -268,13 +297,14 @@ inline void CV_MAIN_LOOP()
 			}else{
 				enemyx0=windowX-enemyW-wallW+5;
 			}
-			speed=prespeed;
+			//speed=prespeed;
 		}
 		//ジャンプ
 		if(jump_r >= 1){
 			if(jump_l >= 1){
 				jump_r=0;
 			} else {
+				/*
 				switch(speed){
 				case 6:
 						frame3+=6;//上昇
@@ -286,6 +316,8 @@ inline void CV_MAIN_LOOP()
 						frame3+=12;//上昇
 						break;
 				}
+				*/
+				frame3+=6;
 				if(frame3 > windowX-playerW-wallW){
 					frame3 = windowX-playerW-wallW;
 					jump_r = 0;//frame3が0ならジャンプフラグ消
@@ -298,6 +330,7 @@ inline void CV_MAIN_LOOP()
 			if(jump_r >= 1){
 				jump_l=0;
 			} else {
+				/*
 				switch(speed){
 				case 6:
 						frame3-=6;//上昇
@@ -309,6 +342,8 @@ inline void CV_MAIN_LOOP()
 						frame3-=12;//上昇
 						break;
 				}
+				*/
+				frame3-=6;
 				if(frame3 < wallW){
 					frame3 = wallW;
 					jump_l = 0;//frame3が0ならジャンプフラグ消
@@ -322,26 +357,59 @@ inline void CV_MAIN_LOOP()
 	glutPostRedisplay();
 	} else {
 //		CV_GAMEOVER();
+		char* rank;
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		sprintf(text,"SCORE:%d",frame);
-
-		render_string(85,135, text);//スコア挿入
-		render_string(75,165,"Restart:[r] , End:[Esc]");//キー説明
+		if(title==0){
+			glBindTexture(GL_TEXTURE_2D,texName[5]);
+			square(0,0,-1,windowX,windowY,1,1,0); //背景
+			sprintf(text,"%d",frame);
+			glColor3d(0.0, 0.0, 0.0);
+			render_str(200,125, text);//スコア挿入
+			if(frame<500){
+				rank="C";
+			} else if(frame < 1000){
+				rank="B";
+			} else if(frame < 1500){
+				rank="A";
+			} else{
+				rank="S";
+			}
+			render_str(200,160, rank);
+		} else {
+			glBindTexture(GL_TEXTURE_2D,texName[5]);
+			square(0,0,-1,windowX,windowY,1,1,0); //背景
+		}
 		glutSwapBuffers();
 		glutPostRedisplay();
 	}
 
 }
 
+void reshape(int w,int h)
+{
+	if(w>h){
+		glViewport(w/2-h/2,0,h,h);
+		winsize=h;
+	} else {
+		glViewport(0,h/2-w/2,w,w);
+		winsize=w;
+	}
+//	glMatrixMode(GL_PROJECTION);
+//	glLoadIdentity();
+//	glOrtho(0,windowX,windowY, 0, -1, 1);
+
+}
+
 void myexit(int i){
+	glutDestroyWindow(winID);
 	cvDestroyWindow("src");
 	cvDestroyWindow("dst");
-	glutDestroyWindow(winID);
-	cvReleaseImage(&fram);
+
+//	cvReleaseImage(&fram);
 	cvReleaseImage(&dst);
 	cvReleaseImage(&mask);
-//	cvReleaseCapture(&capture);
+	cvReleaseCapture(&capture);
 
 
 //return 0;
@@ -362,6 +430,7 @@ void keyboard(unsigned char key, int x, int y)
 
     case 'r':
 		restart=1;
+		if(title==1) title=0;
 		break;
 
 	case 'a':
@@ -374,10 +443,12 @@ void keyboard(unsigned char key, int x, int y)
 		prespeed=12;
 		break;
 	case 'l':
-		jump_r=1;
+		if(jump_l==0)
+			jump_r=1;
 		break;
 	case 'k':
-		jump_l=1;
+		if(jump_r==0)
+			jump_l=1;
 		break;
 
     }
@@ -394,10 +465,12 @@ void special(int key, int x, int y)
   switch (key)
     {
     case GLUT_KEY_RIGHT:
-		jump_r=1;
+		if(jump_l==0)
+			jump_r=1;
 		break;
     case GLUT_KEY_LEFT:
-		jump_l=1;
+		if(jump_r==0)
+			jump_l=1;
 		break;
     }
 }
@@ -433,9 +506,11 @@ winID = glutCreateWindow("Jumping Game");
 glClearColor(1.0,1.0,1.0,1.0);
 
 glutDisplayFunc(CV_MAIN_LOOP);
+glutReshapeFunc(reshape);
 glutKeyboardFunc(keyboard);
 glutSpecialFunc(special);
 init();
+arive=0;
 
 glOrtho(0,windowX,windowY, 0, -1, 1);
 glutMainLoop();
@@ -445,7 +520,7 @@ glutMainLoop();
 cvDestroyWindow("src");
 cvDestroyWindow("dst");
 glutDestroyWindow(glutGetWindow());
-cvReleaseImage(&fram);
+//cvReleaseImage(&fram);
 cvReleaseImage(&dst);
 cvReleaseImage(&mask);
 cvReleaseCapture(&capture);
@@ -531,7 +606,7 @@ inline void GetMaskHSV(IplImage* src, IplImage* mask,int erosions, int dilations
 						if(start ==0){                                    //最初の位置調整用
 							if(top > jump1){ 
 						      start=1;                      //start=1でflagが変えれるように
-							  printf("ok");
+							 // printf("ok");
 							}
 						}
 					  }
@@ -556,23 +631,23 @@ inline void GetMaskHSV(IplImage* src, IplImage* mask,int erosions, int dilations
 	  if(jump_r == 0){           //フラグ設立 ジャンプ作動後、再びflag=0になるまでジャンプ不能にどっかでする事  
 		if((top < jump1) && (top > jump2)){
 		  jump_r =1;             //１でジャンプ始動　高さ低め
-		  printf("1");
+		//  printf("1");
 		}
 	  }
       if(jump_r == 1){
 		if(top < jump2){                 //ジャンプ始動後にflag=２になるから、上がる高さを途中で変更できるようにする面倒
 		  jump_r =2;                          //２で高さ高め
-		  printf("2");
+		//  printf("2");
 		}
 	/*	if(top > jump1){
 		  jump =0;
-		  printf("0");
+		//  printf("0");
 		}*/
 	  }
      /* if(jump == 2){
 		if(top > jump1){
 		  jump =0;
-		  printf("0");                   
+		//  printf("0");                   
 		}
 	  }*/
 	}
