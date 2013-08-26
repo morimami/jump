@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cmath>
 #include <iostream>
+#include <string>
 
 const int windowX = 400;
 const int windowY = 400;
@@ -21,6 +22,7 @@ int jump1,jump2,start=0,jump_r=0,jump_l=0;
 
 int frame2=-enemyH;//障害物動かす用
 int frame3=wallW;//ジャンプ座標設定用
+int frame4=0;//落下用
 int jumpout=0;//ジャンプ下降フラグ
 char key;
 int enemyx0=frame3-5,enemyx1,playerx0,playerx1,enemyy0,enemyy1,playery0,playery1;
@@ -57,8 +59,9 @@ int frame=0;//スコア
 	IplImage* mask = 0;
 	IplImage* dst = 0;
 IplImage *imgB;
-GLuint texName[6];
-GLubyte texImage[6][64][64][4];
+GLuint texName[7];
+GLuint texStrName[14];
+GLubyte texImage[7][64][64][4];
 
 
 IplImage *GetMaskFromRGB(IplImage *RGBImg){
@@ -67,7 +70,7 @@ IplImage *GetMaskFromRGB(IplImage *RGBImg){
 
 	cvCvtColor(RGBImg,gray,CV_RGB2GRAY);
 
-	cvThreshold(gray,gray,250,255,CV_THRESH_BINARY);
+	cvThreshold(gray,gray,245,255,CV_THRESH_BINARY);
 	cvNot(gray,gray);
 	return gray;
 }
@@ -107,10 +110,10 @@ IplImage *loadImageRGBA(const char *filename){
 
 
 void init(){
-	glGenTextures(5,texName);
+	glGenTextures(7,texName);
 	char* filename;
 	IplImage *img;
-	for (int i=0; i<6; i++) {
+	for (int i=0; i<7; i++) {
 		glBindTexture(GL_TEXTURE_2D, texName[i]);
 		switch(i){
 		case 0:
@@ -131,20 +134,75 @@ void init(){
 		case 5:
 			filename="result.png";
 			break;
+		case 6:
+			filename="title.png";
+			break;
 		default:
 			break;
 		}
-		/*
-		for (int j=0; j<64; j++) {
-			for (int k=0; k<64; k++) {
-				texImage[i][j][k][0] = texrgb[i][j*64+k].R;
-				texImage[i][j][k][1] = texrgb[i][j*64+k].G;
-				texImage[i][j][k][2] = texrgb[i][j*64+k].B;
-				texImage[i][j][k][3] = 255;
-			}
+		img = loadImageRGBA(filename);
+		if(img == NULL){
+			
 		}
-		*/
-//		img = cvLoadImage(filename,CV_LOAD_IMAGE_ANYDEPTH | CV_LOAD_IMAGE_ANYCOLOR);
+		cvFlip(img, NULL, 0);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,GL_REPEAT);
+		glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+//		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img->width, img->height,0,GL_RGB,GL_UNSIGNED_BYTE,img->imageData);
+		gluBuild2DMipmaps(GL_TEXTURE_2D,4,img->width,img->height,GL_RGBA,GL_UNSIGNED_BYTE,img->imageData);
+		cvReleaseImage(&img);
+	}
+	glGenTextures(14,texStrName);
+	for (int i=0; i<14; i++) {
+		glBindTexture(GL_TEXTURE_2D, texStrName[i]);
+		switch(i){
+		case 0:
+			filename="str/0.png";
+			break;
+		case 1:
+			filename="str/1.png";
+			break;
+		case 2:
+			filename="str/2.png";
+			break;
+		case 3:
+			filename="str/3.png";
+			break;
+		case 4:
+			filename="str/4.png";
+			break;
+		case 5:
+			filename="str/5.png";
+			break;
+		case 6:
+			filename="str/6.png";
+			break;
+		case 7:
+			filename="str/7.png";
+			break;
+		case 8:
+			filename="str/8.png";
+			break;
+		case 9:
+			filename="str/9.png";
+			break;
+		case 10:
+			filename="str/s.png";
+			break;
+		case 11:
+			filename="str/a.png";
+			break;
+		case 12:
+			filename="str/b.png";
+			break;
+		case 13:
+			filename="str/c.png";
+			break;
+		default:
+			break;
+		}
 		img = loadImageRGBA(filename);
 		if(img == NULL){
 			
@@ -166,20 +224,6 @@ void init(){
 	glAlphaFunc(GL_GREATER, 0);
 }
 
-void render_str(float x,float y, const char* string){
-  float z = 1.0f;
-  char* p;
-  p = (char*) string;
-  glDisable(GL_TEXTURE_2D);
-//  std::cout << p << endl;
-   //glRasterPos3f(x,y,z);
-  glPushMatrix();
-  glTranslatef(x,y,z);
-  glScalef(0.2*(float)winsize/windowX,-0.2*	(float)winsize/windowY,1.0);
-  while(*p != '\0') glutStrokeCharacter(GLUT_STROKE_ROMAN,*p++);
-  glPopMatrix();
-  glEnable(GL_TEXTURE_2D);
-}
 
 void square(int x, int y, int z, int w, int h, int tx,float ty,float ty0){
 	glColor3d(1.0,1.0,1.0);
@@ -190,6 +234,32 @@ void square(int x, int y, int z, int w, int h, int tx,float ty,float ty0){
 	glTexCoord2f(tx, -ty0); glVertex3d(x+w, y, z);
 	glEnd();
 }
+
+void render_str(float x,float y, const char* s){
+  float z = 1.0f;
+  char* p;
+  p = (char*) s;
+  /*
+  glDisable(GL_TEXTURE_2D);
+//  std::cout << p << endl;
+   //glRasterPos3f(x,y,z);
+  glPushMatrix();
+  glTranslatef(x,y+5*(float)winsize/windowY,z);
+  glScalef(0.2*(float)winsize/windowX,-0.2*	(float)winsize/windowY,1.0);
+  while(*p != '\0') glutStrokeCharacter(GLUT_STROKE_ROMAN,*p++);
+  glPopMatrix();
+  glEnable(GL_TEXTURE_2D);
+  */
+  int i=0;
+  int size=20*(float)winsize/windowY;
+  while(p[i]>='0' && p[i]<='9'){
+	glBindTexture(GL_TEXTURE_2D,texStrName[(int)p[i]-'0']);
+	  square(x,y,z,size,size,1,-1,0);
+	  p++;
+	  x+=size;
+  }
+}
+
 
 /********** ここからメインループ ********************/
 inline void CV_MAIN_LOOP()
@@ -210,6 +280,7 @@ inline void CV_MAIN_LOOP()
 		thickness    = 0.1;
 
 		frame=0;//スコア初期化
+		frame4=0;
 		arive=1;
 		if(rand()%2==0){
 			enemyx0=wallW-5;
@@ -221,8 +292,8 @@ inline void CV_MAIN_LOOP()
 		restart = 0;
 	}
 
-	if(arive==1){
-		speed+=0.005;
+//	if(arive==1){
+
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		fram = cvQueryFrame(capture);
 		GetMaskHSV(fram, mask, 1, 1);
@@ -239,17 +310,20 @@ inline void CV_MAIN_LOOP()
 		if(c == 'q') return;
 
 		cvInitFont (&dfont, CV_FONT_HERSHEY_COMPLEX, hscale, vscale,italicscale, thickness, CV_AA);
-	
-		sprintf(text,"SCORE:%d",frame);
-        glColor3d(0.0, 0.0, 0.0);
-		render_str(30,30,text);
+		
+		if(arive==1){
+			speed+=0.005;
+			sprintf(text,"%d",frame);
+		    glColor3d(0.0, 0.0, 0.0);
+			render_str(30,10,text);
+		}
 
 		enemyx1=enemyx0+enemyW;
 		playerx0=frame3;
 		playerx1=frame3+enemyH;
 		enemyy0=frame2;
 		enemyy1=frame2+enemyH;
-		playery0=windowY-50;
+		playery0=windowY-50+frame4;
 		playery1=windowY-50+playerH;
 		
 		glBindTexture(GL_TEXTURE_2D,texName[2]);
@@ -260,10 +334,12 @@ inline void CV_MAIN_LOOP()
 		square(0,0,0.5, wallW, windowY,1,ty,ty0);//壁 left
 		square(windowX-wallW,0,0.5,wallW,windowY,1,ty,ty0);//壁 right
 		glBindTexture(GL_TEXTURE_2D,texName[1]);
-		if(enemyx0==windowX-enemyW-wallW+5){
-			square(enemyx0,enemyy0,0.4, enemyW,enemyH, -1,1,0);//障害物
-		} else {
-			square(enemyx0,enemyy0,0.4, enemyW,enemyH, 1,1,0);//障害物
+		if(arive==1){
+			if(enemyx0==windowX-enemyW-wallW+5){
+				square(enemyx0,enemyy0,0.4, enemyW,enemyH, -1,1,0);//障害物
+			} else {
+				square(enemyx0,enemyy0,0.4, enemyW,enemyH, 1,1,0);//障害物
+			}
 		}
 		if(jump_r>=1){
 			glBindTexture(GL_TEXTURE_2D,texName[3]);
@@ -287,8 +363,7 @@ inline void CV_MAIN_LOOP()
 			arive=0;
 		}
 		//当たり判定終わり
-
-		frame+=1;//スコア
+		if(arive==1) frame+=1;//スコア
 		frame2+=speed;
 		if(frame2>windowY+enemyH){
 			frame2=-enemyH;
@@ -353,36 +428,47 @@ inline void CV_MAIN_LOOP()
 		}
 
 	//ジャンプ終わり
-	glutSwapBuffers();
-	glutPostRedisplay();
-	} else {
+
+//	} else {
 //		CV_GAMEOVER();
-		char* rank;
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	if(arive==0){
+		int rank;
+//		speed=0;
+//		frame2=0;
+//		frame3=0;
+//		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		if(title==0){
 			glBindTexture(GL_TEXTURE_2D,texName[5]);
-			square(0,0,-1,windowX,windowY,1,1,0); //背景
+			square(0,0,0.8,windowX,windowY,1,1,0); //背景
 			sprintf(text,"%d",frame);
 			glColor3d(0.0, 0.0, 0.0);
-			render_str(200,125, text);//スコア挿入
+			render_str(200,110, text);//スコア挿入
 			if(frame<500){
-				rank="C";
+				rank=13;
 			} else if(frame < 1000){
-				rank="B";
+				rank=12;
 			} else if(frame < 1500){
-				rank="A";
+				rank=11;
 			} else{
-				rank="S";
+				rank=10;
 			}
-			render_str(200,160, rank);
+//			render_str(200,160, rank);
+			int size=20*(float)winsize/windowX;
+			glBindTexture(GL_TEXTURE_2D,texStrName[rank]);
+			square(200,140,1.0,size,size,1,-1,0);
+			if(frame4<50){
+				frame4+=8;
+			}
 		} else {
-			glBindTexture(GL_TEXTURE_2D,texName[5]);
-			square(0,0,-1,windowX,windowY,1,1,0); //背景
+			glBindTexture(GL_TEXTURE_2D,texName[6]);
+			square(0,0,0.8,windowX,windowY,1,1,0); //背景
 		}
-		glutSwapBuffers();
-		glutPostRedisplay();
+	//	glutSwapBuffers();
+	//	glutPostRedisplay();
 	}
+	glutSwapBuffers();
+	glutPostRedisplay();
 
 }
 
