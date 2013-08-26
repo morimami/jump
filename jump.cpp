@@ -60,7 +60,7 @@ int score=0;//スコア
 	IplImage* dst = 0;
 IplImage *imgB;
 */
-	IplImage *frame, *new_image, *th_image, *nt_image, *mask_image;
+	IplImage *frame, *new_image, *th_image, *nt_image, *mask_image,*in_image;
 	CvPixelPosition8u pos_src;
 	uchar* p_src;
 	CvCapture *captureDev;
@@ -323,20 +323,26 @@ void sabun(){
 				jump_l=1;             //１でジャンプ始動
 				maxd=0;
 				leftnow=0;
-				printf("1");
+			//	printf("1");
 			}else{
 				if((avlr>celi-20)&&(leftnow==0)){
 					jump_r=1;
 					maxd=0;
 					leftnow=1;
-					printf("2");
+				//	printf("2");
 				}
 			}
 		}
 	}
-	//		cvShowImage("input", new_image);
+	cvReleaseImage(&in_image);
+	in_image = cvCloneImage(new_image);
+		   cvFlip(in_image, NULL, 1);
+			cvShowImage("input", in_image);
+	
 	   cvFlip(th_image, NULL, 1);
+	   cvNot(th_image,th_image);
 	   cvShowImage("output", th_image);
+	   
 }
 
 
@@ -576,7 +582,7 @@ void myexit(int i){
 //	cvReleaseImage(&dst);
 //	cvReleaseImage(&mask);
 //	cvReleaseCapture(&capture);
-//	cvDestroyWindow("input");
+	cvDestroyWindow("input");
 //	cvDestroyWindow("haikei");
 	cvDestroyWindow("output");
 //	cvReleaseImage( &new_image);
@@ -680,7 +686,7 @@ jump2 = fram->height - fram->height / 3;
 	//MessageBox(NULL, _T("画面サイズの取得に失敗しました。"), _T("エラー"), MB_ICONEXCLAMATION);
 	return(-2);
 	}
-//	cvNamedWindow("input", CV_WINDOW_AUTOSIZE);
+	cvNamedWindow("input", CV_WINDOW_AUTOSIZE);
 //	cvNamedWindow("haikei", CV_WINDOW_AUTOSIZE);
 	cvNamedWindow("output", CV_WINDOW_AUTOSIZE);
 
@@ -694,7 +700,7 @@ jump2 = fram->height - fram->height / 3;
 	nt_image = cvCreateImage( cvSize( width, height),  IPL_DEPTH_8U, 1);
 
     new_image = cvQueryFrame(captureDev);
-//	cvShowImage("input", new_image);
+	cvShowImage("input", new_image);
 	frame = cvCloneImage(new_image);
 //	cvShowImage("haikei", frame);
 
