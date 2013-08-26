@@ -17,7 +17,7 @@ const int wallW=30;
 
 //プロジェクトのプロパティ⇒C/C++⇒全般　の追加のインクルードディレクトリに
 // 『C:\OpenCV2.3\include』を追加のこと
-int jump1,jump2,start=0,jump_r=0,jump_l=0;
+int jump1,jump2,start=0;
 #define PI_OVER_180 0.0174532925
 
 int frame2=-enemyH;//障害物動かす用
@@ -51,14 +51,21 @@ inline void CV_GAMEOVER();
 inline void GetMaskHSV(IplImage* src, IplImage* mask,int erosions, int dilations);
 
 CvSize window={windowX,windowY};//ウィンドウサイズ
-int frame=0;//スコア
+int score=0;//スコア
 	 int c;
-
+/*
 	CvCapture* capture = 0;
 	IplImage* fram = 0;
 	IplImage* mask = 0;
 	IplImage* dst = 0;
 IplImage *imgB;
+*/
+	IplImage *frame, *new_image, *th_image, *nt_image, *mask_image;
+	CvPixelPosition8u pos_src;
+	uchar* p_src;
+	CvCapture *captureDev;
+	int jump_l=0,jump_r=0;  
+	int leftnow=1;
 GLuint texName[7];
 GLuint texStrName[14];
 GLubyte texImage[7][64][64][4];
@@ -260,6 +267,78 @@ void render_str(float x,float y, const char* s){
   }
 }
 
+void sabun(){
+	int x=0,y=0,maxl=500,maxr=0,maxd=0,avlr,celi,a;
+	new_image = cvQueryFrame(captureDev);
+	
+	//mask_image = cvCloneImage(frame);
+	cvAbsDiff(new_image,frame,mask_image);
+	//cvShowImage("output", mask_image);
+
+		
+	// frameの内容をニチカ
+	cvCvtColor(mask_image, nt_image, CV_BGR2GRAY);
+	cvThreshold(nt_image,th_image,100,255,CV_THRESH_BINARY);
+
+	jump1 = frame->height - frame->height / 5;
+	cvLine(new_image,cvPoint(0,jump1),cvPoint(frame->width,jump1),cvScalar(200,0,0),3, 4); //わかりやすくラインひく
+	cvLine(new_image,cvPoint(frame->width/2,frame->height),cvPoint(frame->width/2,jump1),cvScalar(200,0,0),3, 4);
+	cvLine(th_image,cvPoint(0,jump1),cvPoint(frame->width,jump1),cvScalar(200,0,0),3, 4);
+	cvLine(th_image,cvPoint(frame->width/2,frame->height),cvPoint(frame->width/2,jump1),cvScalar(200,0,0),3, 4);
+	
+	//探索なう
+	CV_INIT_PIXEL_POS(pos_src, (unsigned char*) th_image->imageData,
+						   th_image->widthStep,cvGetSize(th_image), x, y, th_image->origin);
+	celi = th_image->width /2;
+	for(y = 0; y < th_image->height; y++) {
+		for(x = 0; x < th_image->width; x++) {
+			p_src = CV_MOVE_TO(pos_src, x, y, 1);
+			if(p_src[0]==255){
+				a++;
+				if(a==20){                    //ちょっとしたマスキング
+						if(maxl>x-a){
+						  maxl=x-a;
+						}
+						maxd=y;
+				}
+				if(a>20){
+				       if(maxr<x){
+						  maxr=x;
+					  
+					    } 
+				}
+			}else{
+				a=0;
+			}
+		}
+		
+	}
+	if(maxd==0){
+		maxd = th_image->height;
+ 	}
+	avlr = (maxr+maxl)/2;
+	if((jump_r == 0)&&(jump_l ==0)){
+		if(maxd<jump1){
+			if((avlr<celi+20)&&(leftnow==1)){
+				jump_l=1;             //１でジャンプ始動
+				maxd=0;
+				leftnow=0;
+				printf("1");
+			}else{
+				if((avlr>celi-20)&&(leftnow==0)){
+					jump_r=1;
+					maxd=0;
+					leftnow=1;
+					printf("2");
+				}
+			}
+		}
+	}
+	//		cvShowImage("input", new_image);
+	   cvFlip(th_image, NULL, 1);
+	   cvShowImage("output", th_image);
+}
+
 
 /********** ここからメインループ ********************/
 inline void CV_MAIN_LOOP()
@@ -279,7 +358,7 @@ inline void CV_MAIN_LOOP()
 		italicscale = 0.0f;
 		thickness    = 0.1;
 
-		frame=0;//スコア初期化
+		score=0;//スコア初期化
 		frame4=0;
 		arive=1;
 		if(rand()%2==0){
@@ -295,6 +374,8 @@ inline void CV_MAIN_LOOP()
 //	if(arive==1){
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		sabun();
+		/*
 		fram = cvQueryFrame(capture);
 		GetMaskHSV(fram, mask, 1, 1);
 		cvAnd(fram, mask, dst);
@@ -310,10 +391,11 @@ inline void CV_MAIN_LOOP()
 		if(c == 'q') return;
 
 		cvInitFont (&dfont, CV_FONT_HERSHEY_COMPLEX, hscale, vscale,italicscale, thickness, CV_AA);
-		
+		*/
+
 		if(arive==1){
 			speed+=0.005;
-			sprintf(text,"%d",frame);
+			sprintf(text,"%d",score);
 		    glColor3d(0.0, 0.0, 0.0);
 			render_str(30,10,text);
 		}
@@ -363,7 +445,7 @@ inline void CV_MAIN_LOOP()
 			arive=0;
 		}
 		//当たり判定終わり
-		if(arive==1) frame+=1;//スコア
+		if(arive==1) score+=1;//スコア
 		frame2+=speed;
 		if(frame2>windowY+enemyH){
 			frame2=-enemyH;
@@ -441,14 +523,14 @@ inline void CV_MAIN_LOOP()
 		if(title==0){
 			glBindTexture(GL_TEXTURE_2D,texName[5]);
 			square(0,0,0.8,windowX,windowY,1,1,0); //背景
-			sprintf(text,"%d",frame);
+			sprintf(text,"%d",score);
 			glColor3d(0.0, 0.0, 0.0);
 			render_str(200,110, text);//スコア挿入
-			if(frame<500){
+			if(score<500){
 				rank=13;
-			} else if(frame < 1000){
+			} else if(score < 1000){
 				rank=12;
-			} else if(frame < 1500){
+			} else if(score < 1500){
 				rank=11;
 			} else{
 				rank=10;
@@ -489,13 +571,20 @@ void reshape(int w,int h)
 
 void myexit(int i){
 	glutDestroyWindow(winID);
-	cvDestroyWindow("src");
-	cvDestroyWindow("dst");
 
 //	cvReleaseImage(&fram);
-	cvReleaseImage(&dst);
-	cvReleaseImage(&mask);
-	cvReleaseCapture(&capture);
+//	cvReleaseImage(&dst);
+//	cvReleaseImage(&mask);
+//	cvReleaseCapture(&capture);
+//	cvDestroyWindow("input");
+//	cvDestroyWindow("haikei");
+	cvDestroyWindow("output");
+//	cvReleaseImage( &new_image);
+	cvReleaseImage( &th_image);
+	cvReleaseImage( &nt_image);
+	cvReleaseImage( &mask_image);
+ //   cvReleaseImage( &frame);
+	cvReleaseCapture(&captureDev);
 
 
 //return 0;
@@ -536,6 +625,9 @@ void keyboard(unsigned char key, int x, int y)
 		if(jump_r==0)
 			jump_l=1;
 		break;
+	case 'c':
+		frame = cvCloneImage(new_image);
+		break;
 
     }
 }
@@ -567,6 +659,7 @@ int main( int argc, char **argv)
 {
 
 if(argc == 1 || (argc == 2 && strlen (argv[1]) == 1 && isdigit(argv[1][0])))
+/*
 capture = cvCreateCameraCapture(argc == 2 ? argv[1][0] - '0' : 0);
 
 fram = cvQueryFrame(capture);
@@ -575,10 +668,35 @@ dst = cvCreateImage(cvSize(fram->width, fram->height), IPL_DEPTH_8U, 3);
 
 jump1 = fram->height - fram->height / 5;                             //ジャンプの位置
 jump2 = fram->height - fram->height / 3;
+*/
+	// デバイスハンドラの作成
+	if(!(captureDev = cvCaptureFromCAM(0))){
+	//MessageBox(NULL, _T("デバイスハンドラの作成に失敗しました。"), _T("エラー"), MB_ICONEXCLAMATION);
+	return (-1);
+	}
+	// 初期化 
+	// 画面サイズを得るために一度キャプチャします
+	if(!(frame = cvQueryFrame(captureDev))){
+	//MessageBox(NULL, _T("画面サイズの取得に失敗しました。"), _T("エラー"), MB_ICONEXCLAMATION);
+	return(-2);
+	}
+//	cvNamedWindow("input", CV_WINDOW_AUTOSIZE);
+//	cvNamedWindow("haikei", CV_WINDOW_AUTOSIZE);
+	cvNamedWindow("output", CV_WINDOW_AUTOSIZE);
 
+	const int width = frame->width;
+	const int height = frame->height;
+	// カメラからのキャプチャ画像をRGB変換した画像
+	// マスク画像
+	mask_image = cvCreateImage( cvSize( width, height), frame->depth, frame->nChannels);
+	
+	th_image = cvCreateImage( cvSize( width, height), IPL_DEPTH_8U, 1);
+	nt_image = cvCreateImage( cvSize( width, height),  IPL_DEPTH_8U, 1);
 
-cvNamedWindow("src", CV_WINDOW_AUTOSIZE);
-cvNamedWindow("dst", CV_WINDOW_AUTOSIZE);
+    new_image = cvQueryFrame(captureDev);
+//	cvShowImage("input", new_image);
+	frame = cvCloneImage(new_image);
+//	cvShowImage("haikei", frame);
 
 
 
@@ -603,14 +721,13 @@ glutMainLoop();
 
 //CV_MAIN_LOOP();
 
-cvDestroyWindow("src");
-cvDestroyWindow("dst");
 glutDestroyWindow(glutGetWindow());
 //cvReleaseImage(&fram);
+/*
 cvReleaseImage(&dst);
 cvReleaseImage(&mask);
 cvReleaseCapture(&capture);
-
+*/
 
 //return 0;
 exit(0);
@@ -633,7 +750,7 @@ char key;
 	jump_l = 0;
 	cvInitFont (&dfont, CV_FONT_HERSHEY_COMPLEX, hscale, vscale,italicscale, thickness, CV_AA);
 cvInitFont (&dfont2, CV_FONT_HERSHEY_COMPLEX, hscale2, vscale2,italicscale, thickness, CV_AA);	
-cvSet (imgB, cvScalarAll (255), 0);
+//cvSet (imgB, cvScalarAll (255), 0);
 
 
 
